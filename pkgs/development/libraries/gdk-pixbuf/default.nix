@@ -1,6 +1,6 @@
 { stdenv, fetchurl, meson, ninja, pkgconfig, gettext, python3, libxml2, libxslt, docbook_xsl
 , docbook_xml_dtd_43, gtk-doc, glib, libtiff, libjpeg, libpng, libX11, gnome3
-, jasper, shared-mime-info, libintlOrEmpty, gobjectIntrospection, doCheck ? false }:
+, jasper, shared-mime-info, libintlOrEmpty, gobjectIntrospection, doCheck ? false, makeWrapper }:
 
 let
   pname = "gdk-pixbuf";
@@ -25,7 +25,7 @@ stdenv.mkDerivation rec {
 
   nativeBuildInputs = [
     meson ninja pkgconfig gettext python3 libxml2 libxslt docbook_xsl docbook_xml_dtd_43
-    gtk-doc gobjectIntrospection
+    gtk-doc gobjectIntrospection makeWrapper
   ];
 
   propagatedBuildInputs = [ glib libtiff libjpeg libpng jasper ];
@@ -48,6 +48,17 @@ stdenv.mkDerivation rec {
     ''
       moveToOutput "bin" "$dev"
       moveToOutput "bin/gdk-pixbuf-thumbnailer" "$out"
+
+      # We require runtime access to shared-mime-info
+      ${stdenv.lib.optionalString (!stdenv.isDarwin) ''
+      for f in $dev/bin/*; do
+        wrapProgram $f --prefix XDG_DATA_DIRS : "${shared-mime-info}/share"
+      done
+      wrapProgram $out/bin/gdk-pixbuf-thumbnailer --prefix XDG_DATA_DIRS : "${shared-mime-info}/share"
+      ''}
+
+      # We need to install 'loaders.cache' in lib/gdk-pixbuf-2.0/2.10.0/
+      $dev/bin/gdk-pixbuf-query-loaders --update-cache
     '';
 
   # The tests take an excessive amount of time (> 1.5 hours) and memory (> 6 GB).
